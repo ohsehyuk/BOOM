@@ -1,7 +1,16 @@
-// 👑 [최종 마스터 버전] LocalStorage 피드백 루프 반영 프론트엔드 엔진 (app.js)
+// 👑 [최종 완결본] 6차원 온보딩 + 현재 시간 동기화 + 피드백 루프 탑재 엔진 (app.js)
 
-let userProfile = { gender: '', age: '', purpose: '' };
+// 1. 유저 프로필 상태 정의 (6가지 상세 정보)
+let userProfile = { 
+    gender: '', 
+    age: '', 
+    purpose: '', 
+    companion: '', 
+    transport: '', 
+    tolerance: '' 
+};
 
+// DOM 엘리먼트 긁어오기
 const onboardingScreen = document.getElementById('onboarding-screen');
 const mainScreen = document.getElementById('main-screen');
 const startBtn = document.getElementById('start-btn');
@@ -10,21 +19,28 @@ const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
 const resetProfileBtn = document.getElementById('reset-profile-btn');
 
-// 1️⃣ 온보딩 시스템
+// 2. 6가지 사전 질문 제어 시스템
 function setupOnboarding() {
-    const groups = ['gender-group', 'age-group', 'purpose-group'];
+    const groups = ['gender-group', 'age-group', 'purpose-group', 'companion-group', 'transport-group', 'tolerance-group'];
+    
     groups.forEach(groupId => {
         const group = document.getElementById(groupId);
+        if (!group) return; // 엘리먼트 안전 장치
+        
         const buttons = group.querySelectorAll('.onboard-btn');
+        
         buttons.forEach(btn => {
             btn.addEventListener('click', () => {
+                // 해당 그룹의 다른 버튼 스타일 초기화
                 buttons.forEach(b => {
                     b.classList.remove('bg-emerald-500/20', 'border-emerald-500', 'text-emerald-400');
                     b.classList.add('bg-slate-800', 'border-slate-700', 'text-slate-100');
                 });
+                // 선택된 버튼 활성화 스타일 적용
                 btn.classList.remove('bg-slate-800', 'border-slate-700');
                 btn.classList.add('bg-emerald-500/20', 'border-emerald-500', 'text-emerald-400');
                 
+                // 데이터 수집
                 const key = groupId.split('-')[0];
                 userProfile[key] = btn.getAttribute('data-value');
                 checkOnboardingComplete();
@@ -33,14 +49,16 @@ function setupOnboarding() {
     });
 }
 
+// 6가지 문항을 모두 골랐는지 실시간 검사
 function checkOnboardingComplete() {
-    if (userProfile.gender && userProfile.age && userProfile.purpose) {
+    if (userProfile.gender && userProfile.age && userProfile.purpose && userProfile.companion && userProfile.transport && userProfile.tolerance) {
         startBtn.disabled = false;
-        startBtn.innerText = "BOOM! 시작하기";
-        startBtn.className = "w-full py-4 rounded-xl bg-emerald-500 text-slate-950 font-black text-base cursor-pointer hover:bg-emerald-400 active:scale-95 transition-all duration-300 shadow-xl shadow-emerald-500/20 mb-4";
+        startBtn.innerText = "분석 엔진 기동하기! BOOM!";
+        startBtn.className = "w-full py-4 rounded-xl bg-emerald-500 text-slate-950 font-black text-base cursor-pointer hover:bg-emerald-400 active:scale-95 transition-all duration-300 shadow-xl shadow-emerald-500/20 mb-2";
     }
 }
 
+// 화면 전환 및 재설정 리스너
 startBtn.addEventListener('click', () => {
     onboardingScreen.classList.add('hidden');
     mainScreen.classList.remove('hidden');
@@ -51,7 +69,7 @@ resetProfileBtn.addEventListener('click', () => {
     onboardingScreen.classList.remove('hidden');
 });
 
-// 2️⃣ 자연어 장소 감지 엔진
+// 3. 자연어 장소 매칭 엔진 (places.js 데이터와 대조)
 function detectPlace(inputText) {
     const cleanText = inputText.replace(/\s+/g, '');
     for (const place of SEOUL_PLACES) {
@@ -64,31 +82,24 @@ function detectPlace(inputText) {
     return null;
 }
 
-// 3️⃣ 💾 [4단계 핵심] LocalStorage 집단지성 피드백 제어 함수
+// 4. LocalStorage 기반 집단지성 피드백 제어 시스템
 function saveFeedback(placeCode, feedbackText) {
-    // 기존에 저장된 피드백 리스트 가져오기 (없으면 빈 배열)
     let allFeedbacks = JSON.parse(localStorage.getItem('boom_feedbacks')) || [];
-    
-    // 새 피드백 데이터 객체 추가
     allFeedbacks.push({
         code: placeCode,
         feedback: feedbackText,
         timestamp: new Date().getTime()
     });
-    
-    // 로컬스토리지에 다시 쏙 저장
     localStorage.setItem('boom_feedbacks', JSON.stringify(allFeedbacks));
 }
 
 function getFeedbackHistory(placeCode) {
     if (!placeCode) return [];
     let allFeedbacks = JSON.parse(localStorage.getItem('boom_feedbacks')) || [];
-    // 현재 가려는 장소 코드(예: POI007)와 일치하는 과거 기록만 필터링해서 반환
     return allFeedbacks.filter(item => item.code === placeCode);
 }
 
-
-// 4️⃣ UI 렌더링 및 동적 피드백 버튼 생성
+// 5. 대화창 렌더링 및 동적 UI 컴포넌트 관리
 function appendMessage(sender, text, isSimulated = false, detectedBadge = null, placeCode = null) {
     const messageWrapper = document.createElement('div');
     messageWrapper.className = sender === 'user' ? 'flex flex-col items-end gap-1' : 'flex gap-3 max-w-[85%]';
@@ -116,10 +127,7 @@ function appendMessage(sender, text, isSimulated = false, detectedBadge = null, 
         
         if (isSimulated) {
             typeMessage(textContainer, text, () => {
-                // 타이핑 연출이 완전히 끝나면 피드백 버튼들을 서서히 보여줍니다.
-                if (placeCode) {
-                    renderFeedbackButtons(feedbackArea, placeCode);
-                }
+                if (placeCode) renderFeedbackButtons(feedbackArea, placeCode);
             });
         } else {
             textContainer.innerText = text;
@@ -129,7 +137,7 @@ function appendMessage(sender, text, isSimulated = false, detectedBadge = null, 
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// 타이핑 함수 확장 (끝났을 때 실행할 콜백 기능 추가)
+// 부드러운 글자 도도독 타이핑 효과
 function typeMessage(element, text, callback = null) {
     element.classList.add('typing');
     let index = 0;
@@ -141,13 +149,13 @@ function typeMessage(element, text, callback = null) {
             setTimeout(play, 12);
         } else {
             element.classList.remove('typing');
-            if (callback) callback(); // 타이핑 종료 후 피드백 버튼 노출
+            if (callback) callback();
         }
     }
     play();
 }
 
-// 칩 모양 피드백 버튼을 화면에 직접 만들어주는 함수
+// 답변 완료 후 하단에 피드백 전송 칩 띄우기
 function renderFeedbackButtons(container, placeCode) {
     container.classList.remove('hidden');
     container.innerHTML = `
@@ -159,16 +167,13 @@ function renderFeedbackButtons(container, placeCode) {
     buttons.forEach(btn => {
         btn.addEventListener('click', () => {
             const feedbackText = btn.getAttribute('data-fb');
-            // 1. 로컬스토리지에 저장
             saveFeedback(placeCode, feedbackText);
-            
-            // 2. 피드백 완료 후 연출
-            container.innerHTML = `<span class="text-[10px] text-slate-500 font-medium px-1">✓ 데이터 피드백이 기록되었어! 다음 추천에 반영할게.</span>`;
+            container.innerHTML = `<span class="text-[10px] text-slate-500 font-medium px-1">✓ 피드백 수집 완료! 다음 스케줄 검사 때 연계 분석할게.</span>`;
         });
     });
 }
 
-// 5️⃣ 실시간 서버 전송 로직
+// 6. ⏰ 실시간 시계 동기화 및 서버 전송 파이프라인
 async function handleSend() {
     const text = chatInput.value.trim();
     if (!text) return;
@@ -176,27 +181,38 @@ async function handleSend() {
     const foundPlace = detectPlace(text);
     let badgeText = null;
     let placeCode = null;
-    
     if (foundPlace) {
         badgeText = `${foundPlace.name} (${foundPlace.code})`;
         placeCode = foundPlace.code;
     }
     
+    // 유저 말풍선 생성
     appendMessage('user', text, false, badgeText);
     chatInput.value = '';
     
-    // 💾 로컬스토리지에서 이 장소에 대한 과거 피드백 기록이 있는지 긁어오기
+    // 로컬 과거 이력 확보
     const historyData = getFeedbackHistory(placeCode);
     
-    appendMessage('bot', "실시간 데이터와 유저 기록을 교차 분석 중이야...", false);
+    // 🔥 유저가 전송 버튼을 누른 바로 '지금 이 시점'의 시계 동기화 데이터 생성
+    const now = new Date();
+    const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+    const currentTimeInfo = {
+        date: now.toLocaleDateString('ko-KR'),
+        dayOfWeek: days[now.getDay()],
+        time: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) // 예: 21:12
+    };
     
+    // 임시 로딩 메시지 출력
+    appendMessage('bot', "실시간 타임라인 데이터 세그먼트 동기화 중... 💥", false);
     const allBotMessages = chatMessages.querySelectorAll('.chat-text');
     const loadingElement = allBotMessages[allBotMessages.length - 1];
     loadingElement.classList.add('typing');
 
     try {
-        // 🚀 [⚠️본인 서버 주소 입력⚠️]
-        const WORKER_URL = "https://boom-gem.sh031300.workers.dev"; 
+        // 🚀 [⚠️본인의 클라우드플레어 Workers 주소 입력 확인]
+        const WORKER_URL = "https://boom-ai-worker.sh031300.workers.dev
+
+"; 
         
         const response = await fetch(WORKER_URL, {
             method: "POST",
@@ -205,7 +221,8 @@ async function handleSend() {
                 message: text,
                 place: foundPlace,
                 userProfile: userProfile,
-                history: historyData // 💥 과거 피드백 배열을 서버로 토스!
+                history: historyData,
+                currentTime: currentTimeInfo // 현재 요일 및 시각 바인딩
             })
         });
 
@@ -213,22 +230,24 @@ async function handleSend() {
         loadingElement.classList.remove('typing');
 
         if (data.error) {
-            loadingElement.innerHTML = `<span class="text-rose-400 font-semibold">❌ 에러:</span> ${data.error}`;
+            loadingElement.innerHTML = `<span class="text-rose-400 font-semibold">❌ 에러 발생:</span> ${data.error}`;
             return;
         }
         
+        // 로딩 말풍선 지우고 최종 타이핑 말풍선으로 변환 교체
         loadingElement.innerText = "";
-        // ★ 답변이 끝나면 버튼이 생기도록 장소 코드를 함께 넘겨줍니다.
         appendMessage('bot', data.reply, true, null, placeCode); 
-        // 기존 임시 로딩 말풍선 엘리먼트는 불필요하므로 화면에서 삭제
         loadingElement.closest('.flex').remove();
 
     } catch (error) {
         loadingElement.classList.remove('typing');
-        loadingElement.innerText = "서버와 연결하지 못했어. 주소나 인터넷 상태를 확인해줘!";
+        loadingElement.innerText = "서버 연결에 실패했어. Workers 배포 상태나 주소 오타를 확인해봐!";
     }
 }
 
+// 이벤트 이벤트 연결
 sendBtn.addEventListener('click', handleSend);
 chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
+
+// 최초 기동
 setupOnboarding();
